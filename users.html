@@ -1,0 +1,338 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Terminal Access // Security Vault</title>
+  <link rel="stylesheet" href="style.css">
+  <script>
+    // AUTH GUARD & ANTI-DOSEN GATE
+    const auth = sessionStorage.getItem("ops_auth");
+    const user = JSON.parse(sessionStorage.getItem("active_user"));
+
+    if (auth !== "granted" || !user) {
+      window.location.href = "login.html";
+    } else if (user.role === "evaluator" || user.id === "001") {
+      alert("AKSES DITOLAK: Evaluator / Dosen tidak memiliki izin akses vault pengguna.");
+      window.location.href = "dashboard.html";
+    }
+  </script>
+  <style>
+    .vault-wrapper {
+      max-width: 800px;
+      margin: 0 auto;
+      padding: 24px 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+      flex: 1;
+    }
+    .audit-box {
+      background: rgba(13, 17, 23, 0.9);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 8px;
+      padding: 12px;
+      font-size: 0.8rem;
+      max-height: 220px;
+      overflow-y: auto;
+      font-family: monospace;
+    }
+    .audit-item {
+      padding: 6px 0;
+      border-bottom: 1px dashed rgba(255, 255, 255, 0.08);
+      color: #8b949e;
+      line-height: 1.4;
+    }
+    .audit-item:last-child {
+      border-bottom: none;
+    }
+    .audit-item strong {
+      color: #58a6ff;
+    }
+    .notice {
+      font-size: 0.8rem;
+      padding: 8px 12px;
+      border-radius: 6px;
+      display: none;
+      margin-top: 8px;
+    }
+    .notice.success {
+      background: rgba(46, 160, 67, 0.2);
+      border: 1px solid #3fb950;
+      color: #7ee787;
+    }
+  </style>
+</head>
+<body class="dashboard-body">
+
+  <header class="navbar">
+    <div class="brand-logo">SYS://AUTH_VAULT</div>
+    <div class="nav-actions">
+      <span class="badge online" id="vault-user-badge">USER: ...</span>
+      <a href="dashboard.html" class="nav-link-btn">&larr; Dashboard</a>
+    </div>
+  </header>
+
+  <main class="vault-wrapper">
+    <!-- Panel Form Ganti Password -->
+    <section class="card">
+      <div class="section-header">
+        <h2 class="section-title">> KONTROL AKSES & PASSKEY (SHA-256)</h2>
+      </div>
+
+      <form id="vault-form" class="dashboard-form">
+        <div class="form-group">
+          <label for="target-user">Target Akun Pengguna:</label>
+          <select id="target-user" required></select>
+        </div>
+
+        <div class="form-group">
+          <label for="new-passkey">Passkey Baru:</label>
+          <input type="password" id="new-passkey" placeholder="Ketik passkey baru..." required minlength="4">
+        </div>
+
+        <button type="submit" class="btn btn-primary btn-block">Enkripsi & Simpan Passkey</button>
+        <div id="notice-msg" class="notice success"></div>
+      </form>
+    </section>
+
+    <!-- Panel Khusus Admin: Tambah & Kelola Akun (Default Tersembunyi) -->
+    <section class="card" id="admin-crud-panel" style="display: none;">
+      <div class="section-header">
+        <h2 class="section-title">> REGISTRASI & HAPUS USER (ADMIN ONLY)</h2>
+      </div>
+
+      <form id="add-user-form" class="dashboard-form" style="margin-bottom: 16px;">
+        <div style="display: grid; grid-template-columns: 1fr 2fr; gap: 8px;">
+          <input type="text" id="new-user-id" placeholder="ID (cth: 045)" required maxlength="4">
+          <input type="text" id="new-user-name" placeholder="Nama User" required>
+        </div>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+          <select id="new-user-role">
+            <option value="member">Member</option>
+            <option value="evaluator">Evaluator (Dosen)</option>
+          </select>
+          <input type="password" id="new-user-pass" placeholder="Passkey Awal" required minlength="4">
+        </div>
+        <button type="submit" class="btn btn-primary btn-block">+ Daftarkan Akun Baru</button>
+      </form>
+
+      <div class="audit-box" id="user-management-list">
+        <!-- List akun aktif & tombol hapus muncul di sini -->
+      </div>
+    </section>
+    <!-- Panel Audit Log -->
+    <section class="card">
+      <div class="section-header">
+        <h2 class="section-title">> AUDIT TRAIL LOG PERUBAHAN</h2>
+        <button id="clear-audit" class="btn btn-sm" style="color: #ff7b72;">[Clear Log]</button>
+      </div>
+      <div class="audit-box" id="audit-list">
+        <!-- Log masuk dinamis via JS -->
+      </div>
+    </section>
+  </main>
+
+  <script>
+    const ACCOUNTS_KEY = "SYS_TEAM_ACCOUNTS";
+    const AUDIT_KEY = "SYS_AUTH_LOGS";
+
+    // Data akun awal (PassHash = SHA-256 dari passkey default)
+    const initialAccounts = {
+      "117": { id: "117", name: "Salim", role: "admin", passHash: "504f795cb23f7d464c8bd431098896eba60409f4e50230bea3135656b2842114" },
+      "078": { id: "078", name: "Oswinov", role: "member", passHash: "2f7cd8651694282c6588d7fed7039b7f6e76bcce22db2b364e7326054af2f585" },
+      "090": { id: "090", name: "Nadhif", role: "member", passHash: "1d06b8ebaccd0f99647d7e0b838fc5ee2de0809bdee3414a27ea6f1e52e7e719" },
+      "001": { id: "001", name: "Dosen Penguji", role: "evaluator", passHash: "ac24fb70de8e07fed2965b546d75ccce1776e7c02ffc25c6be88ac5640d9dc90" }
+    };
+
+    let accounts = JSON.parse(localStorage.getItem(ACCOUNTS_KEY)) || initialAccounts;
+    let auditLogs = JSON.parse(localStorage.getItem(AUDIT_KEY)) || [];
+
+    function saveAccounts() {
+      localStorage.setItem(ACCOUNTS_KEY, JSON.stringify(accounts));
+    }
+
+    function saveAudit() {
+      localStorage.setItem(AUDIT_KEY, JSON.stringify(auditLogs));
+    }
+
+    // Helper: SHA-256 Web Crypto API Native
+    async function hashPasskey(str) {
+      const buffer = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(str));
+      return Array.from(new Uint8Array(buffer)).map(b => b.toString(16).padStart(2, "0")).join("");
+    }
+
+    // Render Dropdown berdasarkan Role
+    const targetSelect = document.getElementById("target-user");
+    const activeBadge = document.getElementById("vault-user-badge");
+
+    activeBadge.textContent = `USER: ${user.name} [${user.id}]`;
+
+    function refreshUserOptions() {
+      targetSelect.innerHTML = "";
+      const adminPanel = document.getElementById("admin-crud-panel");
+      const userListEl = document.getElementById("user-management-list");
+
+      if (user.id === "117" || user.role === "admin") {
+        if (adminPanel) adminPanel.style.display = "block";
+        if (userListEl) {
+          userListEl.innerHTML = "";
+
+          Object.values(accounts).forEach(acc => {
+            // Opsi dropdown ganti passkey
+            const opt = document.createElement("option");
+            opt.value = acc.id;
+            opt.textContent = `${acc.name} [${acc.id}] - ${acc.role.toUpperCase()}`;
+            targetSelect.appendChild(opt);
+
+            // Item list akun + tombol hapus
+            const row = document.createElement("div");
+            row.style.cssText = "display: flex; justify-content: space-between; align-items: center; padding: 6px 0; border-bottom: 1px dashed rgba(255,255,255,0.08);";
+            row.innerHTML = `
+              <span><strong>${acc.name}</strong> [${acc.id}] (${acc.role})</span>
+              ${acc.id !== "117" ? `<button type="button" class="btn-delete" data-del="${acc.id}">[Hapus]</button>` : '<span style="color:#3fb950; font-size:0.75rem;">[Root]</span>'}
+            `;
+
+            const delBtn = row.querySelector(".btn-delete");
+            if (delBtn) {
+              delBtn.addEventListener("click", () => deleteUser(acc.id, acc.name));
+            }
+            userListEl.appendChild(row);
+          });
+        }
+      } else {
+        const opt = document.createElement("option");
+        opt.value = user.id;
+        opt.textContent = `${user.name} [${user.id}] (Akun Anda Sendiri)`;
+        targetSelect.appendChild(opt);
+        targetSelect.disabled = true;
+      }
+    }
+    refreshUserOptions();
+
+    // Render Audit Trail List
+    const auditContainer = document.getElementById("audit-list");
+    function renderAuditLogs() {
+      auditContainer.innerHTML = "";
+      if (auditLogs.length === 0) {
+        auditContainer.innerHTML = `<div style="color: #8b949e;">Belum ada riwayat perubahan passkey.</div>`;
+        return;
+      }
+      auditLogs.slice().reverse().forEach(log => {
+        const item = document.createElement("div");
+        item.className = "audit-item";
+        item.innerHTML = `[${log.timestamp}] Passkey akun <strong>"${log.targetName}"</strong> diubah oleh <strong>${log.actor}</strong>.`;
+        auditContainer.appendChild(item);
+      });
+    }
+
+    // Submit ganti password
+    const vaultForm = document.getElementById("vault-form");
+    const newPassInput = document.getElementById("new-passkey");
+    const noticeMsg = document.getElementById("notice-msg");
+
+    vaultForm.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const targetId = targetSelect.value;
+      const rawPass = newPassInput.value.trim();
+
+      if (!rawPass) return;
+
+      const hashed = await hashPasskey(rawPass);
+      accounts[targetId].passHash = hashed;
+      saveAccounts();
+
+      const now = new Date();
+      const timeStr = `${String(now.getDate()).padStart(2, "0")}/${String(now.getMonth() + 1).padStart(2, "0")}/${now.getFullYear()} - ${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
+
+      // Simpan catatan audit
+      auditLogs.push({
+        timestamp: timeStr,
+        targetName: accounts[targetId].name,
+        actor: `${user.name} [${user.id}]`
+      });
+      saveAudit();
+
+      noticeMsg.textContent = `> SUKSES: Passkey untuk ${accounts[targetId].name} berhasil dienkripsi (SHA-256) dan diperbarui!`;
+      noticeMsg.style.display = "block";
+      newPassInput.value = "";
+
+      renderAuditLogs();
+      setTimeout(() => { noticeMsg.style.display = "none"; }, 4000);
+    });
+
+    // Reset log audit
+    document.getElementById("clear-audit").addEventListener("click", () => {
+      if (confirm("Bersihkan seluruh log audit keamanan?")) {
+        auditLogs = [];
+        saveAudit();
+        renderAuditLogs();
+      }
+    });
+// ==========================================================================
+    // LOGIC ADMIN: Tambah User Baru
+    // ==========================================================================
+    const addUserForm = document.getElementById("add-user-form");
+    if (addUserForm) {
+      addUserForm.addEventListener("submit", async (e) => {
+        e.preventDefault();
+        const id = document.getElementById("new-user-id").value.trim();
+        const name = document.getElementById("new-user-name").value.trim();
+        const role = document.getElementById("new-user-role").value;
+        const pass = document.getElementById("new-user-pass").value.trim();
+
+        // Validasi: ID gak boleh kembar
+        if (accounts[id]) {
+          alert(`ERROR: ID [${id}] sudah terdaftar atas nama ${accounts[id].name}!`);
+          return;
+        }
+
+        // Hash passkey baru via Web Crypto
+        const hashed = await hashPasskey(pass);
+        accounts[id] = { id, name, role, passHash: hashed };
+        saveAccounts();
+
+        // Catat di Audit Trail
+        const now = new Date();
+        const timeStr = `${String(now.getDate()).padStart(2, "0")}/${String(now.getMonth() + 1).padStart(2, "0")}/${now.getFullYear()} - ${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
+        
+        auditLogs.push({
+          timestamp: timeStr,
+          targetName: `${name} [${id}]`,
+          actor: `${user.name} (Registrasi Akun Baru)`
+        });
+        saveAudit();
+
+        addUserForm.reset();
+        refreshUserOptions();
+        renderAuditLogs();
+        alert(`Akun ${name} [${id}] berhasil didaftarkan!`);
+      });
+    }
+
+    // ==========================================================================
+    // LOGIC ADMIN: Hapus User
+    // ==========================================================================
+    function deleteUser(id, name) {
+      if (confirm(`Yakin ingin MENGHAPUS akun ${name} [${id}] secara permanen?`)) {
+        delete accounts[id];
+        saveAccounts();
+
+        const now = new Date();
+        const timeStr = `${String(now.getDate()).padStart(2, "0")}/${String(now.getMonth() + 1).padStart(2, "0")}/${now.getFullYear()} - ${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
+
+        auditLogs.push({
+          timestamp: timeStr,
+          targetName: `${name} [${id}]`,
+          actor: `${user.name} (Hapus Akun)`
+        });
+        saveAudit();
+
+        refreshUserOptions();
+        renderAuditLogs();
+      }
+    }
+    renderAuditLogs();
+  </script>
+</body>
+</html>

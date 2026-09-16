@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Terminal Access // Authenticator</title>
+  <link rel="stylesheet" href="style.css">
+  <style>
+    /* Layout layar login terpusat */
+    .login-container {
+      min-height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      padding: 16px;
+    }
+    .login-card {
+      width: 100%;
+      max-width: 380px;
+      text-align: center;
+    }
+    .auth-error {
+      color: #f85149;
+      font-size: 0.8rem;
+      margin-top: 12px;
+      display: none;
+    }
+    .sys-badge {
+      display: inline-block;
+      font-size: 0.7rem;
+      color: #58a6ff;
+      border: 1px solid rgba(88, 166, 255, 0.3);
+      padding: 2px 8px;
+      border-radius: 4px;
+      margin-bottom: 16px;
+      letter-spacing: 1px;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="login-container">
+    <div class="card login-card">
+      <span class="sys-badge">SYS://ENCRYPTED_GATEWAY</span>
+      <h2 class="name" style="margin-bottom: 4px;">OPERATIONAL AUTH</h2>
+      <p class="bio">Ketik Passkey Tim. Sistem otomatis mengenali identitas akun Anda.</p>
+
+      <form id="auth-form" class="dashboard-form">
+        <div class="form-group">
+          <input 
+            type="password" 
+            id="team-key" 
+            placeholder="Masukkan Passkey..." 
+            autocomplete="off" 
+            required 
+            style="text-align: center; letter-spacing: 2px;"
+          >
+        </div>
+
+        <button type="submit" class="btn btn-primary btn-block">Verifikasi & Akses</button>
+        <a href="index.html" class="nav-link-btn" style="display: inline-block; margin-top: 8px; border: none; color: #8b949e;">&larr; Kembali ke Portal Publik</a>
+      </form>
+
+      <div id="error-msg" class="auth-error">> AKSES DITOLAK: Passkey tidak terdaftar di sistem.</div>
+    </div>
+  </div>
+
+  <script>
+    // Reset sesi setiap kali mendarat di login
+    sessionStorage.removeItem("ops_auth");
+    sessionStorage.removeItem("active_user");
+
+    const ACCOUNTS_KEY = "SYS_TEAM_ACCOUNTS";
+
+    // Akun default (SHA-256) jika localStorage di browser masih kosong
+    const defaultAccounts = {
+      "117": { id: "117", name: "Salim", role: "admin", passHash: "504f795cb23f7d464c8bd431098896eba60409f4e50230bea3135656b2842114" },
+      "078": { id: "078", name: "Oswinov", role: "member", passHash: "2f7cd8651694282c6588d7fed7039b7f6e76bcce22db2b364e7326054af2f585" },
+      "090": { id: "090", name: "Nadhif", role: "member", passHash: "1d06b8ebaccd0f99647d7e0b838fc5ee2de0809bdee3414a27ea6f1e52e7e719" },
+      "001": { id: "001", name: "Dosen Penguji", role: "evaluator", passHash: "ac24fb70de8e07fed2965b546d75ccce1776e7c02ffc25c6be88ac5640d9dc90" }
+    };
+
+    // Pastikan database akun tersedia di browser
+    if (!localStorage.getItem(ACCOUNTS_KEY)) {
+      localStorage.setItem(ACCOUNTS_KEY, JSON.stringify(defaultAccounts));
+    }
+
+    // Helper: SHA-256 Web Crypto API Native
+    async function hashPasskey(str) {
+      const buffer = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(str));
+      return Array.from(new Uint8Array(buffer)).map(b => b.toString(16).padStart(2, "0")).join("");
+    }
+
+    const form = document.getElementById("auth-form");
+    const keyInput = document.getElementById("team-key");
+    const errorMsg = document.getElementById("error-msg");
+
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const rawInput = keyInput.value.trim();
+
+      // Enkripsi input user ke SHA-256
+      const inputHash = await hashPasskey(rawInput);
+
+      // Ambil database akun terbaru dari localStorage
+      const currentAccounts = JSON.parse(localStorage.getItem(ACCOUNTS_KEY)) || defaultAccounts;
+
+      // Cari apakah ada akun yang passHash-nya cocok
+      const matchedUser = Object.values(currentAccounts).find(acc => acc.passHash === inputHash);
+
+      if (matchedUser) {
+        sessionStorage.setItem("ops_auth", "granted");
+        sessionStorage.setItem("active_user", JSON.stringify({
+          id: matchedUser.id,
+          name: matchedUser.name,
+          role: matchedUser.role
+        }));
+        window.location.href = "dashboard.html";
+      } else {
+        errorMsg.style.display = "block";
+        keyInput.value = "";
+        keyInput.focus();
+      }
+    });
+  </script>
+</body>
+</html>

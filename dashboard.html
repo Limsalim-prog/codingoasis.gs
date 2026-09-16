@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Team Dashboard</title>
+    <script>
+    if (sessionStorage.getItem("ops_auth") !== "granted") {
+    window.location.href = "login.html";
+     }
+    </script>
+    <link rel="stylesheet" href="style.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body class="dashboard-body">
+
+    <header class="navbar">
+        <div class="brand-logo">CODING OASIS GAMING AND SERVICES</div>
+        <div class="nav-actions">
+            <span class="badge online" id="user-badge">ACTIVE TEAM</span>
+            <a href="users.html" class="nav-link-btn" style="border-color: #58a6ff; color: #58a6ff;">[AccControl]</a>
+            <a href="index.html" class="nav-link-btn" id="logout-btn">[Keluar]</a>
+        </div>
+    </header>
+
+    <main class="dashboard-wrapper">
+
+        <section class="card dashboard-section">
+            <div class="section-header">
+                <h2 class="section-title">STATISTIK TRAFFIC BULANAN</h2>
+                <div class="filter-group">
+                    <select id="stat-month" class="filter-select">
+                    <option value="0">Januari</option>
+                    <option value="1">Februari</option>
+                    <option value="2">Maret</option>
+                    <option value="3">April</option>
+                    <option value="4">Mei</option>
+                    <option value="5">Juni</option>
+                    <option value="6">Juli</option>
+                    <option value="7">Agustus</option>
+                    <option value="8" selected>September</option>
+                    <option value="9">Oktober</option>
+                    <option value="10">November</option>
+                    <option value="11">Desember</option>
+                </select>
+                <select id="stat-year" class="filter-select">
+                    <option value="2026" selected>2026</option>
+                    <option value="2027">2027</option>
+                </select>
+                </div>
+            </div>  
+            <div class="metrics-grid">
+                <div class="metric-box plus">
+                    <span class="metric-label">Total Masuk(Plus)</span>
+                    <span class="metric-value" id="total-income">Rp 0</span>
+                </div>
+                <div class="metric-box minus">
+                    <span class="metric-label">Total Keluar(Minus)</span>
+                    <span class="metric-value" id="total-expense">Rp 0</span>
+                </div>
+                <div class="metric-box status">
+                    <span class="metric-label">Kondisi Saat Ini</span>
+                    <span class="metric-value highlight" id="traffic-status">Analisis... </span>
+                </div>
+            </div>
+
+            <div class="chart-container">
+                <canvas id="performanceChart"></canvas>
+            </div>
+        </section>
+
+        <!--Chart Container -->
+        <div class="dual-dashboard-grid">
+
+            <section class="card calendar-card">
+                <div class="section-header">
+                    <h2 class="section-title">TRACKING BY DAY</h2>
+                    <p class="legend">Hijau : Plus | Merah : Minus | Abu-abu : Tidak Aktif</p>
+                </div>
+
+                <div class="calendar-controls">
+                    <button class="btn btn-sm" id="prev-month">&lt;</button>
+                    <span id="current-month-label">Bulan Tahun</span>
+                    <button class="btn btn-sm" id="next-month">&gt;</button>
+                </div>
+
+                <div class="calendar-grid-header">
+                    <span>Min</span><span>Sen</span><span>Sel</span><span>Rab</span><span>Kam</span><span>Jum</span><span>Sab</span>
+                </div>
+                
+                <div class="calendar-days" id="calendar-days-container">
+       
+                </div>
+                <!-- Legend Kategori Unit Layanan -->
+                <div class="unit-legend-bar" style="margin-top: 14px; padding-top: 10px; border-top: 1px dashed rgba(255,255,255,0.1); display: flex; flex-wrap: wrap; gap: 12px; font-size: 0.75rem; justify-content: center;">
+                    <span style="display: flex; align-items: center; gap: 5px; color: #79c0ff;">
+                        <span style="width: 8px; height: 8px; border-radius: 50%; background: #58a6ff; display: inline-block;"></span> [Unit 01: Game]
+                    </span>
+                    <span style="display: flex; align-items: center; gap: 5px; color: #ffa657;">
+                        <span style="width: 8px; height: 8px; border-radius: 50%; background: #f0883e; display: inline-block;"></span> [Unit 02: Servis]
+                    </span>
+                    <span style="display: flex; align-items: center; gap: 5px; color: #d2a8ff;">
+                        <span style="width: 8px; height: 8px; border-radius: 50%; background: #bc8cff; display: inline-block;"></span> [Operasional Tim]
+                    </span>
+                </div>
+            </section>  
+<!-- Kolom Form Input Data Tim -->
+      <section class="card form-card">
+        <h2 class="section-title">> INPUT LOG TRANSAKSI</h2>
+        
+        <form id="log-form" class="dashboard-form">
+          <div class="form-group">
+            <label for="log-date">Tanggal:</label>
+            <input type="date" id="log-date" required>
+          </div>
+
+          <div class="form-group">
+            <label for="log-type">Tipe Alur:</label>
+            <select id="log-type" required>
+              <option value="plus">Pemasukan (+) [Item Game / Jasa Servis]</option>
+              <option value="minus">Pengeluaran (-) [Modal / Sparepart / Kuota]</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label for="log-unit">Unit Layanan:</label>
+            <select id="log-unit" required>
+              <option value="game">Unit 01: Roblox / Steam</option>
+              <option value="hardware">Unit 02: Elektronik & Servis</option>
+              <option value="operasional">Operasional Tim</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label for="log-amount">Nominal (Rp):</label>
+            <input type="number" id="log-amount" placeholder="Contoh: 50000" required>
+          </div>
+
+          <div class="form-group">
+            <label for="log-desc">Deskripsi Pengerjaan:</label>
+            <input type="text" id="log-desc" placeholder="Contoh: Ganti thermal paste Acer" required>
+          </div>
+
+          <button type="submit" class="btn btn-primary btn-block">Simpan Log ke Sistem</button>
+        </form>
+
+        <!-- Master Link Cloud & Backup Controls -->
+        <div class="system-utilities" style="margin-top: 20px; border-top: 1px dashed rgba(255,255,255,0.1); padding-top: 16px;">
+            <a href="https://drive.google.com" target="_blank" class="btn btn-outline btn-block" style="margin-bottom: 10px;">
+                [Buka Master Folder G-Drive]
+            </a>
+            <div style="display: flex; gap: 8px;">
+                <button type="button" id="backup-btn" class="btn btn-sm btn-block">[Export JSON]</button>
+                <button type="button" id="reset-btn" class="btn btn-sm btn-block" style="color: #ff7b72;">[Reset Data]</button>
+            </div>
+        </div>
+      </section>
+
+    </div>
+
+  </main>
+
+  <!-- Modal Popup Pas Tanggal Kalender Di-klik -->
+  <div class="modal-overlay" id="date-modal" style="display: none;">
+    <div class="card modal-content">
+      <div class="modal-header">
+        <h3 id="modal-date-title">Detail Log: DD/MM/YYYY</h3>
+        <button class="modal-close" id="modal-close-btn">&times;</button>
+      </div>
+      <div class="modal-body" id="modal-log-list">
+        <!-- List rincian pemasukan, pengeluaran, & link foto masuk ke sini via JS -->
+      </div>
+    </div>
+  </div>
+    <script src="app.js"></script>
+</body>
+</html>
